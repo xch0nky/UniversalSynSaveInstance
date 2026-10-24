@@ -4626,6 +4626,8 @@ local function synsaveinstance(...)
 			return "-- Decompiling is disabled"
 		end
 	elseif decompile then
+		local decompiling = {} -- [bytecode] = true while a lane decompiles it
+
 		local function makeDecompiler(decomp, getbytecode, showStatus)
 			return function(script)
 				-- local name = scr.ClassName .. scr.Name
@@ -4638,6 +4640,9 @@ local function synsaveinstance(...)
 					if s then
 						if not bytecode or bytecode == "" then
 							return "-- The Script is Empty"
+						end
+						while decompiling[bytecode] do
+							task.wait() -- ? A copy of this script is being decompiled by another lane; use its result
 						end
 						cached = ldeccache[bytecode]
 					else
@@ -4661,10 +4666,16 @@ local function synsaveinstance(...)
 				end
 
 				local ok, result
+				if bytecode then
+					decompiling[bytecode] = true
+				end
 				if showStatus then
 					ok, result = run_with_loading("Decompiling " .. script.Name, true, nil, decomp, script)
 				else
 					ok, result = decomp(script) -- ? Lanes run at once; prefetchSources shows the status instead
+				end
+				if bytecode then
+					decompiling[bytecode] = nil -- ? Cleared before anything below can error; the cache write below doesn't yield
 				end
 				if not result then
 					ok, result = false, "Empty Output"
@@ -5205,6 +5216,7 @@ local function synsaveinstance(...)
 						prefetchedSources[instance] = output -- ? On error sourceFor decompiles it again, one at a time
 					end
 					finished += 1
+					yieldIfDue() -- ? A decompiler that never yields would otherwise run every lane back to back
 				end
 				stopLane()
 				running -= 1
