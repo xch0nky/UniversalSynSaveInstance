@@ -5178,6 +5178,9 @@ local function synsaveinstance(...)
 		if entry.propsOnly or typeof(instance) ~= "Instance" or decompileIgnoreMap[instance] then
 			return false
 		end
+		if SourceCache and SourceCache[instance] then
+			return false
+		end
 		if IgnoreProperties.Source or not isLuaSourceContainer(instance) or isServerScript(instance) then
 			return false
 		end
